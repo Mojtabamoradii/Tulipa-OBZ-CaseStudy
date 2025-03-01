@@ -7,7 +7,7 @@ process_user_files(
     "assets",
     "yearly-data.csv",
     default_values;
-    map_to_rename_user_columns = Dict("name" => "asset"),
+    map_to_rename_user_columns = Dict(:name => "asset"),
 )
 
 ## write asset-commission file
@@ -19,7 +19,7 @@ process_user_files(
     "assets",
     "yearly-data.csv",
     default_values;
-    map_to_rename_user_columns = Dict("name" => "asset"),
+    map_to_rename_user_columns = Dict(:name => "asset"),
 )
 
 ## write asset-milestone file
@@ -31,7 +31,7 @@ process_user_files(
     "assets",
     "yearly-data.csv",
     default_values;
-    map_to_rename_user_columns = Dict("name" => "asset"),
+    map_to_rename_user_columns = Dict(:name => "asset"),
 )
 
 ## write asset file
@@ -43,7 +43,7 @@ assets = process_user_files(
     "assets",
     "basic-data.csv",
     default_values;
-    map_to_rename_user_columns = Dict("name" => "asset"),
+    map_to_rename_user_columns = Dict(:name => "asset"),
 )
 
 ## if n_rp = 1 (full-year optimization) update is_seasonal to false
@@ -85,7 +85,7 @@ process_user_files(
     "assets",
     "yearly-data.csv",
     default_values;
-    map_to_rename_user_columns = Dict("name" => "asset"),
+    map_to_rename_user_columns = Dict(:name => "asset"),
     number_of_rep_periods = n_rp,
 )
 
