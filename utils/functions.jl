@@ -44,49 +44,45 @@ function process_user_files(
     map_to_rename_user_columns::Dict = Dict(),
     number_of_rep_periods::Int = 1,
 )
+    con = DBInterface.connect(DuckDB.DB)
+
+    tbl_name = "my_tbl"
+    file_glob = "$(starting_name_in_files)*$(ending_name_in_files)"
+    path_glob = joinpath(@__DIR__, input_folder, file_glob)
+    try
+        TulipaIO.create_tbl(con, path_glob; name=tbl_name, union_by_name=true, skip=1)
+    catch err
+        if isa(err, TulipaIO.FileNotFoundError)
+            @warn "Returning empty DataFrame" err
+            return DataFrame()
+        end
+    end
+
+    TulipaIO.rename_cols(con, tbl_name; map_to_rename_user_columns...)
+
     columns = [name for (name, _) in schema]
-    df = DataFrame(Dict(name => Vector{Any}() for name in columns))
-
-    files = filter(
-        file ->
-            startswith(file, starting_name_in_files) && endswith(file, ending_name_in_files),
-        readdir(input_folder),
-    )
-
-    for file in files
-        _df = CSV.read(joinpath(@__DIR__, input_folder, file), DataFrame; header = 2)
-        for (key, value) in map_to_rename_user_columns
-            if key in names(_df)
-                _df = rename!(_df, key => value)
-            end
-        end
-        for column in columns
-            if String(column) ∉ names(_df)
-                _df[!, column] .= missing
-            end
-        end
-        _df = select(_df, columns)
-        df = vcat(df, _df; cols = :union)
+    _cnames = map(Symbol, TulipaIO.tbl_cols(con, tbl_name).column_name)
+    for col in setdiff(_cnames, columns)
+        DBInterface.execute(con, "ALTER TABLE $tbl_name DROP $col")
     end
 
-    for (key, value) in default_values
-        if key in names(df)
-            df[!, key] = coalesce.(df[!, key], value)
-        end
+    _cnames = map(Symbol, TulipaIO.tbl_cols(con, tbl_name).column_name)
+    for (key, value) in filter(p -> p.first in _cnames, default_values)
+        TulipaIO.update_tbl(con, tbl_name, Dict(key => value); where_ = "$key IS NULL")
     end
-
-    df = select(df, columns)
 
     if number_of_rep_periods > 1
-        _df = copy(df)
-        for rp in 2:number_of_rep_periods
-            _df.rep_period .= rp
-            df = vcat(df, _df; cols = :union)
+        tbl_copy = "$(tbl_name)_consolidated"
+        DBInterface.execute(con, "CREATE TABLE $tbl_copy AS SELECT * FROM $tbl_name LIMIT 0")
+        DBInterface.execute(con, "ALTER TABLE $tbl_copy ADD COLUMN rep_period INTEGER")
+        for rp in 1:number_of_rep_periods
+            DBInterface.execute(con, "INSERT INTO $tbl_copy SELECT *, $rp FROM $tbl_name")
         end
+        tbl_name = tbl_copy
     end
 
-    CSV.write(output_file, df; append = true, writeheader = true)
-    return df
+    DBInterface.execute(con, "COPY $tbl_name TO '$output_file' (FORMAT csv, HEADER)")
+    return DBInterface.execute(con, "SELECT * FROM $tbl_name") |> DataFrame
 end
 
 """
