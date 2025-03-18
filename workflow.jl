@@ -1,3 +1,10 @@
+@info "Activating the environment"
+cd(@__DIR__)
+using Pkg: Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+
+@info "Loading the packages"
 using TulipaEnergyModel
 using DuckDB
 using TulipaIO
